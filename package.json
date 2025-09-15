@@ -1,0 +1,25 @@
+{
+  "name": "splatoon3ink-client",
+  "version": "1.0.0",
+  "description": "TypeScript/Node.js client for Splatoon3.ink API - fetch Splatoon 3 schedules",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest"
+  },
+  "keywords": ["splatoon3", "splatoon3.ink", "api-client", "schedule", "websocket", "typescript"],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0",
+    "@types/node-fetch": "^2.6.0"
+  }
+}
