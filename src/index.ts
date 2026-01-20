@@ -1,7 +1,10 @@
 // Main exports for the Splatoon3.ink API Client
 
-export { Splatoon3InkClient } from './client'
-export { MemoryCache, FileCache } from './cache'
+import { Splatoon3InkClient } from './client.js'
+import type { MatchType, ScheduleInfo, CacheProvider, Locale } from './types.js'
+
+export { Splatoon3InkClient } from './client.js'
+export { MemoryCache, FileCache } from './cache.js'
 export type {
   MatchType,
   ScheduleInfo,
@@ -9,7 +12,7 @@ export type {
   CacheProvider,
   CacheEntry,
   Locale
-} from './types'
+} from './types.js'
 
 // Convenience function for quick usage
 export async function getSchedule(

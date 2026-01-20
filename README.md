@@ -1,10 +1,16 @@
 # Splatoon3.ink API Client
 
-Node.js/TypeScript client for the [Splatoon3.ink](https://splatoon3.ink) API to fetch Splatoon 3 match schedules.
+Personal Node.js/TypeScript client for the [Splatoon3.ink](https://splatoon3.ink) API to fetch Splatoon 3 match schedules.
+
+> **Note**: This is a personal project. Not published to npm.
+
+## Requirements
+
+- Node.js >= 18.0.0
 
 ## Data Source
 
-This library depends on the [Splatoon3.ink](https://splatoon3.ink) API to fetch real-time Splatoon 3 schedule data. Splatoon3.ink is a community-maintained service that provides Splatoon 3 game data.
+This library depends on the [Splatoon3.ink](https://splatoon3.ink) API to fetch real-time Splatoon 3 schedule data. Splatoon3.ink is a community-maintained unofficial service that provides Splatoon 3 game data.
 
 ## Features
 
@@ -19,9 +25,10 @@ This library depends on the [Splatoon3.ink](https://splatoon3.ink) API to fetch 
 ## Installation
 
 ```bash
-npm install splatoon3ink-client
-# or
-yarn add splatoon3ink-client
+git clone https://github.com/your-username/splatoon3ink-client.git
+cd splatoon3ink-client
+npm install
+npm run build
 ```
 
 ## Quick Usage
@@ -149,8 +156,8 @@ Quick function to get schedule for a specific time.
 ### `Splatoon3InkClient`
 Main client class with methods:
 - `fetchSchedules()` - Get raw schedule data from Splatoon3.ink
-- `fetchLocale()` - Get Japanese localization data from Splatoon3.ink
-- `getScheduleForTime(dateTime, matchType)` - Get parsed schedule
+- `fetchLocale(locale?)` - Get localization data from Splatoon3.ink
+- `getScheduleForTime(dateTime, matchType, locale?)` - Get parsed schedule
 
 ### Cache Providers
 - `MemoryCache` - In-memory caching (default)

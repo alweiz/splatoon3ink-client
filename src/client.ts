@@ -1,6 +1,19 @@
-import fetch from 'node-fetch'
-import { Splatoon3ApiClient, MatchType, ScheduleInfo, CacheProvider, Locale } from './types'
-import { MemoryCache } from './cache'
+import {
+  Splatoon3ApiClient,
+  MatchType,
+  ScheduleInfo,
+  CacheProvider,
+  Locale,
+  SchedulesResponse,
+  SchedulesData,
+  LocaleData,
+  MatchSetting,
+  BankaraMatchSetting,
+  ScheduleNode,
+  EventScheduleNode,
+  TimePeriod
+} from './types.js'
+import { MemoryCache } from './cache.js'
 
 export class Splatoon3InkClient implements Splatoon3ApiClient {
   private baseUrl = 'https://splatoon3.ink/data'
@@ -14,11 +27,11 @@ export class Splatoon3InkClient implements Splatoon3ApiClient {
     this.defaultLocale = defaultLocale
   }
 
-  async fetchSchedules(): Promise<any> {
+  async fetchSchedules(): Promise<SchedulesResponse> {
     const cacheKey = 'splatoon3_schedules'
 
     // Check cache first
-    const cached = this.cache.get(cacheKey)
+    const cached = this.cache.get<SchedulesResponse>(cacheKey)
     if (cached) {
       return cached
     }
@@ -35,18 +48,18 @@ export class Splatoon3InkClient implements Splatoon3ApiClient {
       throw new Error(`Failed to fetch Splatoon3 schedules (status: ${response.status})`)
     }
 
-    const data = await response.json()
+    const data = await response.json() as SchedulesResponse
     this.cache.set(cacheKey, data)
 
     return data
   }
 
-  async fetchLocale(locale?: Locale): Promise<any> {
+  async fetchLocale(locale?: Locale): Promise<LocaleData> {
     const targetLocale = locale || this.defaultLocale
     const cacheKey = `splatoon3_locale_${targetLocale}`
 
     // Check cache first
-    const cached = this.cache.get(cacheKey)
+    const cached = this.cache.get<LocaleData>(cacheKey)
     if (cached) {
       return cached
     }
@@ -63,7 +76,7 @@ export class Splatoon3InkClient implements Splatoon3ApiClient {
       throw new Error(`Failed to fetch Splatoon3 locale (status: ${response.status})`)
     }
 
-    const data = await response.json()
+    const data = await response.json() as LocaleData
     this.cache.set(cacheKey, data)
 
     return data
@@ -76,88 +89,31 @@ export class Splatoon3InkClient implements Splatoon3ApiClient {
         this.fetchLocale(locale)
       ])
 
-      const schedules = rawData?.data
-      if (!schedules) {
-        throw new Error('Failed to get schedule data')
-      }
-
+      const schedules: SchedulesData = rawData.data
       const userMillis = dateTime.getTime()
-      let nodes: any[] = []
-      let matchKey: string = ''
-      let subMode: string | null = null
 
-      // Select appropriate schedule type
-      switch (matchType) {
-        case 'regular':
-          nodes = schedules.regularSchedules.nodes
-          matchKey = 'regularMatchSetting'
-          break
-        case 'bankara_open':
-          nodes = schedules.bankaraSchedules.nodes
-          matchKey = 'bankaraMatchSettings'
-          subMode = 'OPEN'
-          break
-        case 'bankara_challenge':
-          nodes = schedules.bankaraSchedules.nodes
-          matchKey = 'bankaraMatchSettings'
-          subMode = 'CHALLENGE'
-          break
-        case 'xmatch':
-          nodes = schedules.xSchedules.nodes
-          matchKey = 'xMatchSetting'
-          break
-        case 'event':
-          nodes = schedules.eventSchedules.nodes
-          matchKey = 'leagueMatchSetting'
-          break
-        case 'fest':
-          nodes = schedules.festSchedules?.nodes || []
-          matchKey = 'festMatchSetting'
-          break
-        default:
-          throw new Error(`Unknown match type: ${matchType}`)
-      }
-
-      // Find matching time slot
-      const targetNode = nodes.find(node => {
-        const start = new Date(node.startTime).getTime()
-        const end = new Date(node.endTime).getTime()
-        return userMillis >= start && userMillis < end
-      })
-
-      if (!targetNode) {
+      // Find matching schedule and extract match setting
+      const result = this.findMatchingSchedule(schedules, matchType, userMillis)
+      if (!result) {
         return null
       }
 
-      // Extract match settings
-      let matchSetting: any
-      if (subMode && targetNode[matchKey]) {
-        const settings = Array.isArray(targetNode[matchKey])
-          ? targetNode[matchKey]
-          : [targetNode[matchKey]]
-        matchSetting = settings.find((s: any) => s.mode === subMode)
-      } else {
-        matchSetting = targetNode[matchKey]
-      }
-
-      if (!matchSetting) {
-        return null
-      }
+      const { matchSetting, startTime, endTime } = result
 
       // Get localized names
       const ruleId = matchSetting.vsRule?.id
       const stage1Id = matchSetting.vsStages?.[0]?.id
       const stage2Id = matchSetting.vsStages?.[1]?.id
 
-      const rule = ruleId ? this.getLocalizedName(localeData, ruleId) : 'Unknown Rule'
-      const stage1 = stage1Id ? this.getLocalizedName(localeData, stage1Id) : 'Unknown Stage'
-      const stage2 = stage2Id ? this.getLocalizedName(localeData, stage2Id) : 'Unknown Stage'
+      const rule = ruleId ? this.getLocalizedName(localeData, 'rules', ruleId) : 'Unknown Rule'
+      const stage1 = stage1Id ? this.getLocalizedName(localeData, 'stages', stage1Id) : 'Unknown Stage'
+      const stage2 = stage2Id ? this.getLocalizedName(localeData, 'stages', stage2Id) : 'Unknown Stage'
 
       return {
         rule,
         stages: [stage1, stage2],
-        startTime: targetNode.startTime,
-        endTime: targetNode.endTime
+        startTime,
+        endTime
       }
 
     } catch (error) {
@@ -166,19 +122,100 @@ export class Splatoon3InkClient implements Splatoon3ApiClient {
     }
   }
 
-  private getLocalizedName(locale: any, id: string): string {
-    // Navigate through the locale object to find the name
-    const keys = id.split('/')
-    let current = locale
+  private findMatchingSchedule(
+    schedules: SchedulesData,
+    matchType: MatchType,
+    userMillis: number
+  ): { matchSetting: MatchSetting; startTime: string; endTime: string } | null {
+    switch (matchType) {
+      case 'regular':
+        return this.findInNodes(
+          schedules.regularSchedules.nodes,
+          userMillis,
+          (node) => node.regularMatchSetting
+        )
 
-    for (const key of keys) {
-      if (current && typeof current === 'object') {
-        current = current[key]
-      } else {
-        return id // Fallback to ID if path not found
+      case 'bankara_open':
+        return this.findInNodes(
+          schedules.bankaraSchedules.nodes,
+          userMillis,
+          (node) => node.bankaraMatchSettings?.find(s => s.bankaraMode === 'OPEN')
+        )
+
+      case 'bankara_challenge':
+        return this.findInNodes(
+          schedules.bankaraSchedules.nodes,
+          userMillis,
+          (node) => node.bankaraMatchSettings?.find(s => s.bankaraMode === 'CHALLENGE')
+        )
+
+      case 'xmatch':
+        return this.findInNodes(
+          schedules.xSchedules.nodes,
+          userMillis,
+          (node) => node.xMatchSetting
+        )
+
+      case 'event':
+        return this.findInEventNodes(schedules.eventSchedules.nodes, userMillis)
+
+      case 'fest':
+        if (!schedules.festSchedules?.nodes) return null
+        return this.findInNodes(
+          schedules.festSchedules.nodes,
+          userMillis,
+          (node) => node.festMatchSettings?.[0] ?? null
+        )
+
+      default:
+        return null
+    }
+  }
+
+  private findInNodes<T extends ScheduleNode>(
+    nodes: T[],
+    userMillis: number,
+    getMatchSetting: (node: T) => MatchSetting | null | undefined
+  ): { matchSetting: MatchSetting; startTime: string; endTime: string } | null {
+    for (const node of nodes) {
+      const start = new Date(node.startTime).getTime()
+      const end = new Date(node.endTime).getTime()
+      if (userMillis >= start && userMillis < end) {
+        const matchSetting = getMatchSetting(node)
+        if (matchSetting) {
+          return {
+            matchSetting,
+            startTime: node.startTime,
+            endTime: node.endTime
+          }
+        }
       }
     }
+    return null
+  }
 
-    return current?.name || current || id
+  private findInEventNodes(
+    nodes: EventScheduleNode[],
+    userMillis: number
+  ): { matchSetting: MatchSetting; startTime: string; endTime: string } | null {
+    for (const node of nodes) {
+      const timePeriod = node.timePeriods?.find((tp: TimePeriod) => {
+        const start = new Date(tp.startTime).getTime()
+        const end = new Date(tp.endTime).getTime()
+        return userMillis >= start && userMillis < end
+      })
+      if (timePeriod && node.leagueMatchSetting) {
+        return {
+          matchSetting: node.leagueMatchSetting,
+          startTime: timePeriod.startTime,
+          endTime: timePeriod.endTime
+        }
+      }
+    }
+    return null
+  }
+
+  private getLocalizedName(locale: LocaleData, category: string, id: string): string {
+    return locale[category]?.[id]?.name || id
   }
 }

@@ -1,4 +1,6 @@
-import { CacheProvider, CacheEntry } from './types'
+import { CacheProvider, CacheEntry } from './types.js'
+import fs from 'node:fs'
+import path from 'node:path'
 
 /**
  * In-memory cache implementation for Node.js environment
@@ -42,38 +44,34 @@ export class MemoryCache implements CacheProvider {
  * File-based cache implementation for persistent storage
  */
 export class FileCache implements CacheProvider {
-  private fs: any
-  private path: any
   private cacheDir: string
 
   constructor(cacheDir: string = './cache') {
-    this.fs = require('fs')
-    this.path = require('path')
     this.cacheDir = cacheDir
 
     // Ensure cache directory exists
-    if (!this.fs.existsSync(cacheDir)) {
-      this.fs.mkdirSync(cacheDir, { recursive: true })
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true })
     }
   }
 
   private getCacheFilePath(key: string): string {
-    return this.path.join(this.cacheDir, `${key}.json`)
+    return path.join(this.cacheDir, `${key}.json`)
   }
 
   get<T>(key: string): T | null {
     try {
       const filePath = this.getCacheFilePath(key)
-      if (!this.fs.existsSync(filePath)) return null
+      if (!fs.existsSync(filePath)) return null
 
-      const content = this.fs.readFileSync(filePath, 'utf8')
+      const content = fs.readFileSync(filePath, 'utf8')
       const entry: CacheEntry<T> = JSON.parse(content)
 
       const now = Date.now()
       const ttl = 60 * 60 * 1000 // 1 hour
 
       if (now - entry.timestamp > ttl) {
-        this.fs.unlinkSync(filePath)
+        fs.unlinkSync(filePath)
         return null
       }
 
@@ -91,7 +89,7 @@ export class FileCache implements CacheProvider {
         timestamp: Date.now(),
         data: value
       }
-      this.fs.writeFileSync(filePath, JSON.stringify(entry, null, 2))
+      fs.writeFileSync(filePath, JSON.stringify(entry, null, 2))
     } catch (error) {
       console.warn(`Failed to write cache for key ${key}:`, error)
     }
@@ -100,8 +98,8 @@ export class FileCache implements CacheProvider {
   delete(key: string): void {
     try {
       const filePath = this.getCacheFilePath(key)
-      if (this.fs.existsSync(filePath)) {
-        this.fs.unlinkSync(filePath)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
       }
     } catch (error) {
       console.warn(`Failed to delete cache for key ${key}:`, error)
