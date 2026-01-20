@@ -2,6 +2,7 @@
   "name": "splatoon3ink-client",
   "version": "1.0.0",
   "description": "TypeScript/Node.js client for Splatoon3.ink API - fetch Splatoon 3 schedules",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -18,8 +19,7 @@
     "jest": "^29.0.0",
     "@types/jest": "^29.0.0"
   },
-  "dependencies": {
-    "node-fetch": "^3.3.0",
-    "@types/node-fetch": "^2.6.0"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
