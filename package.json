@@ -1,6 +1,6 @@
 {
   "name": "splatoon3ink-client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "TypeScript/Node.js client for Splatoon3.ink API - fetch Splatoon 3 schedules",
   "type": "module",
   "main": "dist/index.js",
